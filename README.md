@@ -14,7 +14,7 @@ The "test_*.py" files have usage examples
 
 - "test_datatypes.py" → Data types and a sort of "introduction" to the library
 
-- "test_lists.py" → How to store, update, read and delete lists precisely + how to do DBTransactions
+- "test_lists.py" → How to store, update, read and delete lists precisely + how to do transactions
 
 - "test_hashmaps" → How to store, update, read and delete dictionaries precisely
 
