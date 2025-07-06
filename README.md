@@ -4,7 +4,7 @@
 
 This is the file: "a_key_value_store_on_top_of_sqlite.py"
 
-Just copy the library to your code, no need to go through pip
+Just copy it directly to your code and rename it to something smaller
 
 ## How to use
 
@@ -20,7 +20,7 @@ The "test_*.py" files have usage examples
 
 - "test_fmatch.py" → How to do a fuzzy search
 
-- "test_classes.py" → The DBControl and DBTransaction classes, the less verbose way to deal with this library
+- "test_classes.py" → The DBControl and DBTransaction classes, the recommended way to work with this library
 
 ### These are some facts you will notice
 
