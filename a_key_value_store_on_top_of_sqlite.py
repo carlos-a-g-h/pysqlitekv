@@ -66,6 +66,37 @@ def util_dtype_check(dtype:int)->bool:
 		_TYPE_ANY
 	)
 
+def util_extract_correct_value(
+		row:tuple,
+		tgt_col:Optional[str]=None
+	)->Optional[Any]:
+
+	# NOTE:
+	# this tuple is the result of a select WITHOUT the ID
+	# ( data type, str, int, blob )
+
+	if tgt_col is not None:
+
+		if tgt_col==_SQL_COL_VALUE_STR:
+			return row[1]
+		if tgt_col==_SQL_COL_VALUE_INT:
+			return row[2]
+		if tgt_col==_SQL_COL_VALUE_BLOB:
+			return pckl_decode(row[3])
+
+		return None
+
+	# Use data type in row[0]
+
+	if row[0]==_TYPE_STRING:
+		return row[1]
+	if row[0]==_TYPE_INT:
+		return row[2]
+	if row[0] in (_TYPE_LIST,_TYPE_HASHMAP,_TYPE_ANY):
+		return pckl_decode(row[3])
+
+	return None
+
 def util_get_dtype_col_from_dtype_id(dtype:int)->str:
 
 	if dtype==0:
@@ -103,7 +134,7 @@ def util_is_cur(con_or_cur:Union[SQLConnection,SQLCursor])->bool:
 
 	return isinstance(con_or_cur,SQLCursor)
 
-# Connection/init functions
+# Connection and init functions
 
 def db_init(
 		filepath:Path,
@@ -237,8 +268,8 @@ def db_post(
 	# NOTE:
 	# If you push a list or a mapping,
 	# they can only be updated/modified with
-	# db_lpost, db_ldelete (list oriented)
-	# and db_hupdate (mapping orientend)
+	# db_lpost, db_ldelete (for lists)
+	# and db_hupdate (for hashmaps)
 
 	dtype=util_get_dtype_id_from_value(value)
 	if dtype is None:
@@ -303,70 +334,43 @@ def db_get(
 	cur=db_getcur(con_or_cur)
 
 	cur.execute(
-		f"SELECT {_SQL_COL_TYPE} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+		f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_STR},{_SQL_COL_VALUE_INT},{_SQL_COL_VALUE_BLOB} "
+			f"FROM {_SQL_TAB_ITEMS} "
+				f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+					f"""AND {_SQL_COL_TYPE}>{_TYPE_STRING-1} """
+					f"""AND {_SQL_COL_TYPE}<{_TYPE_ANY+1};"""
 	)
-	result=cur.fetchone()
-	if result is None:
+	select_result=cur.fetchone()
+
+	if isolated:
+		cur.close()
+
+	if select_result is None:
 		if verbose:
 			print(
 				db_get.__name__,
 				f"{key_ready} Not found"
 			)
-		if isolated:
-			cur.close()
+
 		return None
-	dtype=result[0]
-	if not util_dtype_check(dtype):
+
+	the_value=util_extract_correct_value(select_result)
+	if the_value is None:
 		if verbose:
 			print(
 				db_get.__name__,
-				f"{key_ready} Does not have a valid type"
+				f"{key_ready} Not found in {select_result} ?"
 			)
-		if isolated:
-			cur.close()
+
 		return None
-
-	target_col=util_get_dtype_col_from_dtype_id(dtype)
-	cur.execute(
-		f"SELECT {target_col} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-	)
-
-	result=cur.fetchone()
-	if result is None:
-		if verbose:
-			print(
-				db_get.__name__,
-				f"{key_ready} Not found (wtf)"
-			)
-		if isolated:
-			cur.close()
-		return None
-
-	if isolated:
-		cur.close()
-
-	# Data structures
-
-	if target_col==_SQL_COL_VALUE_BLOB:
-		if display_results:
-			print(
-				f"{db_get.__name__}[{key_ready}] =",
-				pckl_decode(result[0])
-			)
-
-		return pckl_decode(result[0])
-
-	# Strings and Numbers
 
 	if display_results:
 		print(
 			f"{db_get.__name__}[{key_ready}] =",
-			result[0]
+			the_value
 		)
 
-	return result[0]
+	return the_value
 
 def db_delete(
 		con_or_cur:Union[SQLConnection,SQLCursor],
@@ -382,17 +386,31 @@ def db_delete(
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 
-	cur.execute(
-		f"SELECT {_SQL_COL_TYPE} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-	)
+	if return_value:
+
+		cur.execute(
+			f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_STR},{_SQL_COL_VALUE_INT},{_SQL_COL_VALUE_BLOB} "
+				f"FROM {_SQL_TAB_ITEMS} "
+					f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+						f"""AND {_SQL_COL_TYPE}>{_TYPE_STRING-1} """
+						f"""AND {_SQL_COL_TYPE}<{_TYPE_ANY+1};"""
+		)
+
+	if not return_value:
+
+		# NOTE: this is better in case the row is screwed up or whatever and the only choice left is to nuke it
+
+		cur.execute(
+			f"SELECT {_SQL_COL_KEY} FROM {_SQL_TAB_ITEMS} "
+				f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+		)
 
 	result=cur.fetchone()
 	if result is None:
 		if verbose:
 			print(
 				db_delete.__name__,
-				f"{key_name} Not found"
+				f"{key_ready} Not found"
 			)
 		if isolated:
 			cur.close()
@@ -401,42 +419,20 @@ def db_delete(
 		return False
 
 	value:Optional[Any]=None
+
 	if return_value:
 
-		dtype=result[0]
-		if not util_dtype_check(dtype):
+		value=util_extract_correct_value(result)
+		if value is None:
 			if verbose:
 				print(
 					db_delete.__name__,
-					f"{key_name} Does not have a valid type"
+					f"{key_ready} Not found in {result} ?"
 				)
 			if isolated:
 				cur.close()
+
 			return None
-
-		target_col=util_get_dtype_col_from_dtype_id(dtype)
-
-		cur.execute(
-			f"SELECT {target_col} FROM {_SQL_TAB_ITEMS} "
-				f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-		)
-		result=cur.fetchone()
-		if result is None:
-			if verbose:
-				print(
-					db_delete.__name__,
-					f"{key_name} Not found (wutt)"
-				)
-			if isolated:
-				cur.close()
-			return None
-
-		cur.close()
-
-		if not target_col==_SQL_COL_VALUE_BLOB:
-			value=result[0]
-
-		value=pckl_decode(result[0])
 
 	cur.execute(
 		f"DELETE FROM {_SQL_TAB_ITEMS} "
@@ -468,8 +464,11 @@ def db_lpost(
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 	cur.execute(
-		f"SELECT {_SQL_COL_TYPE} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+		f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_BLOB} "
+			f"FROM {_SQL_TAB_ITEMS} "
+				f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+					f"AND {_SQL_COL_TYPE}>{_TYPE_STRING-1} "
+					f"AND {_SQL_COL_TYPE}<{_TYPE_ANY+1};"
 	)
 	result=cur.fetchone()
 	if result is not None:
@@ -480,22 +479,7 @@ def db_lpost(
 				cur.close()
 				return False
 
-			cur.execute(
-				f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
-					f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-			)
-			result=cur.fetchone()
-			if result is None:
-				if verbose:
-					print(
-						db_lpost.__name__,
-						f"{key_name} Not found (wtf)"
-					)
-				if isolated:
-					cur.close()
-				return False
-
-			the_thing=pckl_decode(result[0])
+			the_thing=pckl_decode(result[1])
 
 			if not is_list:
 				the_thing.append(value)
@@ -596,8 +580,8 @@ def db_lget(
 
 	query=(
 		f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" AND """
-				f"{_SQL_COL_TYPE}={_TYPE_LIST}"
+			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+				f"AND {_SQL_COL_TYPE}={_TYPE_LIST}"
 	)
 	cur.execute(query.strip())
 	result=cur.fetchone()
@@ -708,8 +692,8 @@ def db_ldelete(
 	cur=db_getcur(con_or_cur)
 	cur.execute(
 		f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" AND """
-				f"{_SQL_COL_TYPE}={_TYPE_LIST}"
+			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+				f"AND {_SQL_COL_TYPE}={_TYPE_LIST}"
 	)
 
 	result=cur.fetchone()
@@ -1123,16 +1107,29 @@ def db_fmstr(
 
 class DBControl:
 
-	con:Optional[SQLConnection]=None
-	cur:Optional[SQLCursor]=None
+	# fpath:Optional[Path]=None
+	# setup:bool=False
 
 	verbose:bool=False
 
+	as_cm:bool=False
+
+	con:Optional[SQLConnection]=None
+	cur:Optional[SQLCursor]=None
+
+	def dbg_msg(self,message:str):
+		if self.verbose:
+			print(
+				self.__class__.__name__,
+				message
+			)
+
 	def __init__(
-		self,filepath:Path,
-		setup:bool=False,
-		cfg_verbose:bool=False,
-	):
+			self,
+			filepath:Path,
+			setup:bool=False,
+			cfg_verbose:bool=False
+		):
 
 		self.verbose=cfg_verbose
 
@@ -1142,10 +1139,98 @@ class DBControl:
 		if not setup:
 			self.con=db_getcon(filepath)
 
+		# self.fpath=filepath
+		# self.setup=setup
+
+	def __enter__(self):
+
+		self.dbg_msg("opening context manager")
+
+		self.as_cm=True
+
+		return self
+
+	def __exit__(self,exc_type,exc_value,exc_traceback):
+
+		if not self.as_cm:
+			self.dbg_msg("NOTE: This method is not meant to run outside the context manager")
+			raise Exception("WTF man")
+
+		has_cursor=(self.cur is not None)
+		has_tx=self.con.in_transaction
+
+		self.dbg_msg(f"closing context manager; has_cursor = {has_cursor}; has_tx = {has_tx}")
+
+		if exc_type is None:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("committing changes to the pending transaction on the cursor")
+				self.cur.execute("COMMIT;")
+				self.cur.close()
+				has_tx=self.con.in_transaction
+
+			if has_tx:
+				self.dbg_msg("committing changes to ALL pending transactions from this connection")
+				self.con.commit()
+
+		if exc_type is not None:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("rolling back due to an error")
+				self.cur.execute("ROLLBACK;")
+
+		if has_cursor:
+			self.dbg_msg("closing the cursor before closing the connection")
+			self.cur.close()
+
+		self.dbg_msg("closing the connection")
+		self.con.close()
+
+	def close(self,rollback:bool=False)->bool:
+
+		# NOTE: Rollback only works if the cursor is up and it has a pending transaction
+
+		if self.as_cm:
+			self.dbg_msg("NOTE: This method is not meant to run inside a context manager")
+			return False
+
+		has_cursor=(self.cur is not None)
+		has_tx=self.con.in_transaction
+
+		self.dbg_msg(f"closing the object; has_cursor = {has_cursor}; has_tx = {has_tx}")
+
+		if not rollback:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("committing changes to the pending transaction on the cursor")
+				self.cur.execute("COMMIT;")
+				self.cur.close()
+				has_tx=self.con.in_transaction
+
+			if has_tx:
+				self.dbg_msg("committing changes to ALL pending transactions from this connection")
+				self.con.commit()
+
+		if rollback:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("rolling back due to an error")
+				self.cur.execute("ROLLBACK;")
+
+		if has_cursor:
+			self.dbg_msg("closing the cursor before closing the connection")
+			self.cur.close()
+
+		self.dbg_msg("closing the connection")
+		self.con.close()
+
+		return True
+
 	def db_tx_begin(self)->bool:
 
 		if self.cur is not None:
 			return False
+
 		if self.con.in_transaction:
 			return False
 
@@ -1391,12 +1476,6 @@ class DBTransaction:
 	sqlcon:Optional[SQLConnection]=None
 	verbose:bool=False
 
-	# NOTE: About the unsafe mode
-	# If you start the context manager and there is a
-	# pending transaction, the pending transaction is
-	# rolled back by default
-	# Unsafe mode commits that previous transaction
-
 	def __init__(
 			self,sqlcon:SQLConnection,
 			cfg_verbose:bool=False,
@@ -1405,46 +1484,12 @@ class DBTransaction:
 		self.sqlcon=sqlcon
 		self.verbose=cfg_verbose
 
-	def __enter__(self):
-
+	def dbg_msg(self,message:str):
 		if self.verbose:
-			if self.sqlcon.in_transaction:
-				print(
-					DBTransaction.__name__,
-					"WARNING: There is a pending transaction"
-				)
-
 			print(
-				DBTransaction.__name__,
-				"openning transaction..."
+				self.__class__.__name__,
+				message
 			)
-
-		self.cur=db_getcur(
-			self.sqlcon,
-			begin_transaction=True,
-			verbose=self.verbose
-		)
-		return self
-
-	def __exit__(self,exc_type,exc_value,exc_traceback):
-
-		# https://abbybounty.github.io/python/context-manager-exception-handling-with-python
-
-		if exc_type is None:
-			if self.verbose:
-				print(
-					DBTransaction.__name__,
-					"all good, committing changes to the db"
-				)
-			self.cur.execute("COMMIT")
-
-		if exc_type is not None:
-			if self.verbose:
-				print(
-					DBTransaction.__name__,
-					"rolling back changes due to an exception"
-				)
-			self.cur.execute("ROLLBACK")
 
 	def db_post(
 			self,
@@ -1573,3 +1618,31 @@ class DBTransaction:
 			sub_str,
 		)
 
+	def __enter__(self):
+
+		self.dbg_msg("opening context manager...")
+
+		if self.sqlcon.in_transaction:
+			self.dbg_msg("WARNING: There is a pending transaction on this connection")
+
+		self.cur=db_getcur(
+			self.sqlcon,
+			begin_transaction=True,
+			verbose=self.verbose
+		)
+		return self
+
+	def __exit__(self,exc_type,exc_value,exc_traceback):
+
+		self.dbg_msg("closing context manager...")
+
+		if exc_type is None:
+			self.dbg_msg("committing changes to the database")
+			self.cur.execute("COMMIT")
+
+		if exc_type is not None:
+			self.dbg_msg("rolling back changes due to an error")
+			self.cur.execute("ROLLBACK")
+
+		self.dbg_msg("closing the cursor")
+		self.cur.close()

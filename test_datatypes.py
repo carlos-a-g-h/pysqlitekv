@@ -3,7 +3,7 @@
 from a_key_value_store_on_top_of_sqlite import (
 	db_init,
 	db_post,db_lpost,db_hupdate,
-	db_get,
+	db_get,db_delete
 )
 
 from pathlib import Path
@@ -43,5 +43,8 @@ if __name__=="__main__":
 	db_get(sqlcon,key,display_results=True)
 	db_hupdate(sqlcon,key,data_to_add={"name":"Charles","age":30},data_to_remove=["nice"])
 	db_get(sqlcon,key,display_results=True)
+
+	deleted=db_delete(sqlcon,key)
+	print("DELETED:",deleted)
 
 	sqlcon.close()

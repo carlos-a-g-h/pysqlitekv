@@ -21,7 +21,7 @@ if __name__=="__main__":
 	db_tx_commit(cur)
 
 	db_tx_begin(cur)
-	db_get(cur,key,print_instead=True)
+	db_get(cur,key,display_results=True)
 	print("Name:",db_hget(cur,key,["name"]))
 	db_hupdate(cur,key,data_to_add={"unknown":True},data_to_remove=["name","age"])
 	db_tx_commit(cur,close_cursor=True)
