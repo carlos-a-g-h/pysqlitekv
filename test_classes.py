@@ -3,15 +3,15 @@
 from a_key_value_store_on_top_of_sqlite import (
 	DBControl,
 	DBTransaction,
-	db_getcon,db_post,db_hupdate,db_get
+	db_getcon,db_get
 )
 
 if __name__=="__main__":
 
 	from pathlib import Path
 
-	fpath=Path("ftest_classes.db")
-	if fpath.exists():
+	fpath=Path("example_classes.db")
+	if fpath.is_file():
 		fpath.unlink()
 
 	# The DBControl class
@@ -74,8 +74,11 @@ if __name__=="__main__":
 
 	# DBTransaction
 
-	# The DBTransaction class takes an aready existing connection,
-	# it is recommended to use the standalone versions of db_init() and db_getcon()
+	# The DBTransaction class takes an aready existing connection and creates a cursor
+	# and a transaction in its context manager
+
+	# It is recommended to use the standalone versions of db_init() and db_getcon()
+	# to get a connection
 
 	print("\nDBTransaction class (context manager only)")
 
@@ -104,9 +107,18 @@ if __name__=="__main__":
 
 	new_con.close()
 
-	# NOTE:
-	# DBTransaction can only be used inside a context manager
-
 	# VERY IMPORTANT NOTE:
+
 	# It is not recommended AT ALL to use DBTransaction within DBControl's context manager 
-	# unless you know exactly what you are doing
+	# unless you know exactly what you are doing, because both classes are meant to be
+	# used in different scenarios:
+
+	# DBControl → Creates a connection from scratch and its own cursors and transactions
+	# Recommended for looking around stuff in the database
+
+	# DBTransaction → Creates a cursor + a transaction from existing connection
+	# Recommended for precise writes on the database
+
+	# Both classes have ALL the standalone methods. In the specific case of DBTransaction,
+	# the only methods that are missing are the ones that have to do with controlling
+	# transactions, this is because THAT IS THE CONTEXT MANAGER'S JOB

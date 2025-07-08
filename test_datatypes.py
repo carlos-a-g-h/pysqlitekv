@@ -3,15 +3,14 @@
 from a_key_value_store_on_top_of_sqlite import (
 	db_init,
 	db_post,db_lpost,db_hupdate,
-	db_get,db_delete
+	db_get,db_delete,
 )
 
 from pathlib import Path
 
 if __name__=="__main__":
 
-
-	fpath=Path("ftest_classes.db")
+	fpath=Path("example_datatypes.db")
 	if fpath.is_file():
 		fpath.unlink()
 
@@ -24,9 +23,13 @@ if __name__=="__main__":
 
 	# This one will failed because the key is already occupied
 	try:
-		db_post(sqlcon,key,69,verbose=True)
+		db_post(sqlcon,"seventy",70,verbose=True)
+		db_post(sqlcon,"seventy One",71,verbose=True)
+		db_post(sqlcon,"six nine",69,verbose=True)
+		# db_post(sqlcon,key,69,verbose=True)
 	except Exception as exc:
 		print(db_post.__name__,exc)
+
 	db_get(sqlcon,key,display_results=True)
 
 	# THis one will work

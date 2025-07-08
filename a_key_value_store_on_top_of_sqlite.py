@@ -21,6 +21,10 @@ _SQL_COL_VALUE_STR="Value_as_String"
 _SQL_COL_VALUE_INT="Value_as_Int"
 _SQL_COL_VALUE_BLOB="Value_as_Any"
 
+_SORT_LOW_TO_HI=1
+_SORT_NONE=0
+_SORT_HI_TO_LOW=-1
+
 _TYPE_STRING=0
 _TYPE_INT=1
 _TYPE_LIST=2
@@ -31,7 +35,8 @@ _TYPE_ANY=4
 
 def util_fmatch(
 		text_sub:str,
-		text_orig:Optional[str]
+		text_orig:Optional[str],
+		starts_with:bool,
 	)->int:
 
 	# 0 = No match
@@ -49,6 +54,10 @@ def util_fmatch(
 
 	text_orig_low=text_orig.strip().lower()
 	text_sub_low=text_sub.strip().lower()
+
+	if starts_with:
+		if not text_orig_low.startswith(text_sub_low):
+			return score
 
 	if text_orig_low.find(text_sub_low)>-1:
 		score=score+1
@@ -129,6 +138,86 @@ def util_get_dtype_id_from_value(data:Any)->Optional[int]:
 		data_type=_TYPE_LIST
 
 	return data_type
+
+def util_bquery_select(
+		keyname:Optional[str]=None,
+		datatype:int=-1,
+	)->str:
+
+	has_keyname=isinstance(keyname,str)
+	spec_datatype=(
+		datatype in (
+			_TYPE_STRING,_TYPE_INT,
+			_TYPE_LIST,_TYPE_HASHMAP,
+			_TYPE_ANY
+		)
+	)
+
+	# SELECT
+
+	query="SELECT"
+
+	if not spec_datatype:
+		query=(
+			f"{query} {_SQL_COL_TYPE},"
+				f"{_SQL_COL_VALUE_STR},"
+				f"{_SQL_COL_VALUE_INT},"
+				f"{_SQL_COL_VALUE_BLOB}"
+		)
+	if spec_datatype:
+		query=(
+			f"{query} {util_get_dtype_col_from_dtype_id(datatype)}"
+		)
+
+	query=f"{query} FROM {_SQL_TAB_ITEMS}"
+
+	# WHERE
+
+	ok=False
+
+	woa={
+		False:"WHERE",
+		True:"AND"
+	}
+
+	if has_keyname:
+		query=(
+			f"{query} {woa[ok]} "
+			f"""{_SQL_COL_KEY}="{keyname}" """
+		)
+		query.strip()
+		ok=True
+
+	if spec_datatype:
+		query=(
+			f"{query} {woa[ok]} "
+			f"{_SQL_COL_TYPE}={datatype}"
+		)
+		ok=True
+
+	if not spec_datatype:
+		query=(
+			f"{query} "
+				f"{woa[ok]} ( {_SQL_COL_TYPE}={_TYPE_STRING} OR {_SQL_COL_TYPE}>{_TYPE_STRING} ) "
+				f"{woa[True]} ( {_SQL_COL_TYPE}={_TYPE_ANY} OR {_SQL_COL_TYPE}<{_TYPE_ANY} )"
+		)
+
+	# print(query)
+
+	return query.strip()
+
+def util_bquery_insert(replace:bool=False)->str:
+
+	query="INSERT"
+	if replace:
+		query=f"{query} OR REPLACE"
+
+	query=(
+		f"{query} INTO {_SQL_TAB_ITEMS} "
+		"VALUES(?,?,?,?,?)"
+	)
+
+	return query
 
 def util_is_cur(con_or_cur:Union[SQLConnection,SQLCursor])->bool:
 
@@ -284,14 +373,6 @@ def db_post(
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 
-	query="INSERT"
-	if force:
-		query=f"{query} OR REPLACE"
-	query=(
-		f"{query} INTO {_SQL_TAB_ITEMS} "
-		"VALUES(?,?,?,?,?)"
-	)
-
 	key_ready=key_name.strip().lower()
 	params:Optional[tuple]=None
 
@@ -302,7 +383,10 @@ def db_post(
 	if dtype in (_TYPE_ANY,_TYPE_LIST,_TYPE_HASHMAP):
 		params=(key_ready,dtype,None,None,pckl_encode(value))
 
-	cur.execute(query,params)
+	cur.execute(
+		util_bquery_insert(replace=force),
+		params
+	)
 
 	if isolated:
 		con_or_cur.commit()
@@ -334,11 +418,14 @@ def db_get(
 	cur=db_getcur(con_or_cur)
 
 	cur.execute(
-		f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_STR},{_SQL_COL_VALUE_INT},{_SQL_COL_VALUE_BLOB} "
-			f"FROM {_SQL_TAB_ITEMS} "
-				f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-					f"""AND {_SQL_COL_TYPE}>{_TYPE_STRING-1} """
-					f"""AND {_SQL_COL_TYPE}<{_TYPE_ANY+1};"""
+
+		util_bquery_select(keyname=key_ready)
+
+		# f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_STR},{_SQL_COL_VALUE_INT},{_SQL_COL_VALUE_BLOB} "
+		# 	f"FROM {_SQL_TAB_ITEMS} "
+		# 		f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+		# 			f"""AND ({_SQL_COL_TYPE}={_TYPE_STRING} OR {_SQL_COL_TYPE}>{_TYPE_STRING}) """
+		# 			f"""AND ({_SQL_COL_TYPE}<{_TYPE_ANY} OR {_SQL_COL_TYPE}<{_TYPE_ANY});"""
 	)
 	select_result=cur.fetchone()
 
@@ -375,7 +462,7 @@ def db_get(
 def db_delete(
 		con_or_cur:Union[SQLConnection,SQLCursor],
 		key_name:str,
-		return_value:bool=False,
+		return_val:bool=False,
 		verbose:bool=False
 	)->Union[bool,Optional[Any]]:
 
@@ -386,17 +473,20 @@ def db_delete(
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 
-	if return_value:
+	if return_val:
 
 		cur.execute(
-			f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_STR},{_SQL_COL_VALUE_INT},{_SQL_COL_VALUE_BLOB} "
-				f"FROM {_SQL_TAB_ITEMS} "
-					f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-						f"""AND {_SQL_COL_TYPE}>{_TYPE_STRING-1} """
-						f"""AND {_SQL_COL_TYPE}<{_TYPE_ANY+1};"""
+
+			util_bquery_select(keyname=key_ready)
+
+			# f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_STR},{_SQL_COL_VALUE_INT},{_SQL_COL_VALUE_BLOB} "
+			# 	f"FROM {_SQL_TAB_ITEMS} "
+			# 		f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+			# 			f"""AND ({_SQL_COL_TYPE}={_TYPE_STRING} OR {_SQL_COL_TYPE}>{_TYPE_STRING}) """
+			# 			f"""AND ({_SQL_COL_TYPE}={_TYPE_ANY} OR {_SQL_COL_TYPE}<{_TYPE_ANY});"""
 		)
 
-	if not return_value:
+	if not return_val:
 
 		# NOTE: this is better in case the row is screwed up or whatever and the only choice left is to nuke it
 
@@ -414,13 +504,13 @@ def db_delete(
 			)
 		if isolated:
 			cur.close()
-		if return_value:
+		if return_val:
 			return None
 		return False
 
 	value:Optional[Any]=None
 
-	if return_value:
+	if return_val:
 
 		value=util_extract_correct_value(result)
 		if value is None:
@@ -442,7 +532,7 @@ def db_delete(
 		con_or_cur.commit()
 		cur.close()
 
-	if return_value:
+	if return_val:
 		return value
 
 	return True
@@ -467,8 +557,8 @@ def db_lpost(
 		f"SELECT {_SQL_COL_TYPE},{_SQL_COL_VALUE_BLOB} "
 			f"FROM {_SQL_TAB_ITEMS} "
 				f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-					f"AND {_SQL_COL_TYPE}>{_TYPE_STRING-1} "
-					f"AND {_SQL_COL_TYPE}<{_TYPE_ANY+1};"
+					f"""AND ({_SQL_COL_TYPE}={_TYPE_STRING} OR {_SQL_COL_TYPE}>{_TYPE_STRING}) """
+					f"""AND ({_SQL_COL_TYPE}={_TYPE_ANY} OR {_SQL_COL_TYPE}<{_TYPE_ANY});"""
 	)
 	result=cur.fetchone()
 	if result is not None:
@@ -517,16 +607,8 @@ def db_lpost(
 	if is_list:
 		value_ok.extend(value)
 
-	the_query="INSERT"
-	if force:
-		the_query=f"{the_query} OR REPLACE"
-	the_query=(
-		f"{the_query} INTO {_SQL_TAB_ITEMS} "
-		"VALUES(?,?,?,?,?)"
-	)
-
 	cur.execute(
-		the_query,
+		util_bquery_insert(replace=force),
 		(
 			key_ready,
 			_TYPE_LIST,
@@ -553,7 +635,7 @@ def db_lget(
 		key_name:str,target:Union[int,tuple],
 		display_results:bool=False,
 		verbose:bool=False,
-	)->Optional[Union[list,Any]]:
+	)->Union[list,Optional[Any]]:
 
 	select_one=isinstance(target,int)
 	select_slice=isinstance(target,tuple)
@@ -568,22 +650,34 @@ def db_lget(
 				idx_min_ok or
 				idx_max_ok
 			)
+			if select_slice:
+				if idx_min_ok:
+					select_slice=(target[0]>0 or target[0]==0)
+					if select_slice:
+						if idx_max_ok:
+							select_slice=(target[1]>0 or target[1]==0)
+							if select_slice and idx_max_ok and idx_min_ok:
+								select_slice=(target[0]>target[1])
 
 	if not (select_one or select_slice):
-		raise Exception(
-			f"{db_lget.__name__}: target not valid"
-		)
+		if not select_one:
+			return []
+		return None
 
 	key_ready=key_name.strip().lower()
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 
 	query=(
-		f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-				f"AND {_SQL_COL_TYPE}={_TYPE_LIST}"
+		util_bquery_select(
+			keyname=key_ready,
+			datatype=_TYPE_INT
+		)
+		# f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
+		# 	f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+		# 		f"AND {_SQL_COL_TYPE}={_TYPE_LIST}"
 	)
-	cur.execute(query.strip())
+	cur.execute(query)
 	result=cur.fetchone()
 	if result is None:
 		if verbose:
@@ -663,9 +757,9 @@ def db_ldelete(
 		con_or_cur:Union[SQLConnection,SQLCursor],
 		key_name:str,
 		target:Union[int,tuple],
-		return_values:bool=False,
+		return_val:bool=False,
 		verbose:bool=False,
-	)->bool:
+	)->Union[bool,list,Optional[Any]]:
 
 	select_one=isinstance(target,int)
 	select_slice=isinstance(target,tuple)
@@ -680,20 +774,32 @@ def db_ldelete(
 				idx_min_ok or
 				idx_max_ok
 			)
+			if select_slice:
+				if idx_min_ok:
+					select_slice=(target[0]>0 or target[0]==0)
+					if select_slice:
+						if idx_max_ok:
+							select_slice=(target[1]>0 or target[1]==0)
+							if select_slice and idx_max_ok and idx_min_ok:
+								select_slice=(target[0]>target[1])
 
 	if not (select_one or select_slice):
-		raise Exception(
-			f"{db_ldelete.__name__}: target not valid"
-		)
+		if not select_one:
+			return []
+		return None
 
 	key_ready=key_name.strip().lower()
 
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 	cur.execute(
-		f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
-				f"AND {_SQL_COL_TYPE}={_TYPE_LIST}"
+		util_bquery_select(
+			keyname=key_ready,
+			datatype=_TYPE_LIST
+		)
+		# f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
+		# 	f"""WHERE {_SQL_COL_KEY}="{key_ready}" """
+		# 		f"AND {_SQL_COL_TYPE}={_TYPE_LIST}"
 	)
 
 	result=cur.fetchone()
@@ -705,7 +811,7 @@ def db_ldelete(
 			)
 		if isolated:
 			cur.close()
-		if return_values:
+		if return_val:
 			if not select_one:
 				return []
 			return None
@@ -721,11 +827,11 @@ def db_ldelete(
 
 		if target>-1:
 			if target>size-1:
-				if return_values:
+				if return_val:
 					return None
 				return False
 
-			if return_values:
+			if return_val:
 				return the_thing.pop(target)
 
 			the_thing.pop(target)
@@ -734,17 +840,17 @@ def db_ldelete(
 		# From the end
 
 		if target>size:
-			if return_values:
+			if return_val:
 				return None
 			return False
 
 		idx=(-1)*target
 
-		if return_values:
+		if return_val:
 			values.append(
 				the_thing.pop(idx)
 			)
-		if not return_values:
+		if not return_val:
 			the_thing.pop(idx)
 
 	if size>0 and select_slice:
@@ -761,7 +867,7 @@ def db_ldelete(
 		if not idx_max_ok:
 			idx_max=size
 		if idx_min>idx_max:
-			if return_values:
+			if return_val:
 				return []
 			return False
 
@@ -775,11 +881,11 @@ def db_ldelete(
 			if targets==0:
 				break
 
-			if return_values:
+			if return_val:
 				values.append(
 					the_thing.pop(idx)
 				)
-			if not return_values:
+			if not return_val:
 				the_thing.pop(idx)
 
 			size=size-1
@@ -802,7 +908,7 @@ def db_ldelete(
 		con_or_cur.commit()
 		cur.close()
 
-	if return_values:
+	if return_val:
 		if select_slice:
 			return values
 		if select_one:
@@ -816,7 +922,7 @@ def db_hupdate(
 		data_to_add:Mapping={},
 		data_to_remove:list=[],
 		force:bool=False,
-		return_value:bool=False,
+		return_val:bool=False,
 		verbose:bool=False,
 	)->Union[bool,Mapping]:
 
@@ -826,7 +932,7 @@ def db_hupdate(
 	has_stuff_to_remove=(len(data_to_remove)>0)
 
 	if not (has_stuff_to_add or has_stuff_to_remove):
-		if return_value:
+		if return_val:
 			return {}
 
 		return False
@@ -836,9 +942,13 @@ def db_hupdate(
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 	cur.execute(
-		f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" AND """
-				f"{_SQL_COL_TYPE}={_TYPE_HASHMAP}"
+		util_bquery_select(
+			keyname=key_ready,
+			datatype=_TYPE_HASHMAP
+		)
+		# f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
+		# 	f"""WHERE {_SQL_COL_KEY}="{key_ready}" AND """
+		# 		f"{_SQL_COL_TYPE}={_TYPE_HASHMAP}"
 	)
 	result=cur.fetchone()
 
@@ -848,11 +958,15 @@ def db_hupdate(
 
 			the_thing:Mapping=pckl_decode(result[0])
 
+			removed_data:Mapping={}
+
 			if has_stuff_to_remove:
 				for target in data_to_remove:
 					if target not in the_thing.keys():
 						continue
-					the_thing.pop(target)
+					removed_data.update(
+						{target:the_thing.pop(target)}
+					)
 
 			if has_stuff_to_add:
 				the_thing.update(data_to_add)
@@ -874,8 +988,8 @@ def db_hupdate(
 				con_or_cur.commit()
 				cur.close()
 
-			if return_value:
-				return the_thing
+			if return_val:
+				return removed_data
 
 			return True
 
@@ -906,19 +1020,27 @@ def db_hupdate(
 def db_hget(
 		con_or_cur:Union[SQLConnection,SQLCursor],
 		key_name:str,
-		target:list=[],
+		subkeys:list=[],
 		display_results:bool=False,
 		verbose:bool=False,
 	)->Mapping:
+
+	if len(subkeys)==0:
+		# If you say you want nothing, you get nothing
+		return {}
 
 	key_ready=key_name.strip().lower()
 	isolated=isinstance(con_or_cur,SQLConnection)
 	cur=db_getcur(con_or_cur)
 
 	cur.execute(
-		f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
-			f"""WHERE {_SQL_COL_KEY}="{key_ready}" AND """
-				f"{_SQL_COL_TYPE}={_TYPE_HASHMAP}"
+		util_bquery_select(
+			keyname=key_ready,
+			datatype=_TYPE_HASHMAP
+		)
+		# f"SELECT {_SQL_COL_VALUE_BLOB} FROM {_SQL_TAB_ITEMS} "
+		# 	f"""WHERE {_SQL_COL_KEY}="{key_ready}" AND """
+		# 		f"{_SQL_COL_TYPE}={_TYPE_HASHMAP}"
 	)
 	result=cur.fetchone()
 	if result is None:
@@ -934,29 +1056,20 @@ def db_hget(
 
 	the_thing:Mapping=pckl_decode(result[0])
 
-	if len(target)==0:
-		if display_results:
-			print(the_thing)
-			return {}
-
-		return the_thing
-
 	# Specific keys
 
 	selection={}
 
-	for key in target:
-
+	for key in subkeys:
 		if key not in the_thing.keys():
 			continue
-
 		selection.update(
 			{key:the_thing.pop(key)}
 		)
 
 	if display_results:
 		print(
-			f"{db_hget.__name__}[{key_ready}]{target} =",
+			f"{db_hget.__name__}[{key_ready}]{subkeys} =",
 			selection
 		)
 		return {}
@@ -1025,13 +1138,14 @@ def db_len(
 
 # The following are fuzzy matching functions
 
-def db_fmstr(
+def db_fz_str(
 		con_or_cur:Union[SQLConnection,SQLCursor],
-		text_sub:str,
+		substring:str,
+		starts_with:bool=False,
 		display_results:bool=False,
 	)->list:
 
-	text_ok=text_sub.strip()
+	text_ok=substring.strip()
 
 	matches=[]
 	matches_exact=[]
@@ -1049,7 +1163,8 @@ def db_fmstr(
 	for row in cur:
 		res=util_fmatch(
 			text_ok,
-			row[1]
+			row[1],
+			starts_with
 		)
 		if res==0:
 			continue
@@ -1099,16 +1214,95 @@ def db_fmstr(
 				break
 
 	if display_results:
-		print(db_fmstr,text_ok,final_list)
+		print(
+			db_fz_str.__name__,
+			text_ok,
+			final_list
+		)
 
 	return final_list
+
+def db_fz_num(
+		con_or_cur:Union[SQLConnection,SQLCursor],
+		target:Union[int,tuple],
+		sort_results:int=0,
+		display_results:bool=False
+	)->Optional[list]:
+
+	select_one=isinstance(target,int)
+	select_slice=isinstance(target,tuple)
+	idx_min_ok=False
+	idx_max_ok=False
+	if select_slice:
+		select_slice=len(target)==2
+		if select_slice:
+			idx_min_ok=isinstance(target[0],int)
+			idx_max_ok=isinstance(target[1],int)
+			select_slice=(
+				idx_min_ok or
+				idx_max_ok
+			)
+
+	if not (select_one or select_slice):
+		raise Exception(
+			f"{db_fz_num.__name__}: target not valid"
+		)
+
+	query=(
+		f"SELECT {_SQL_COL_KEY},{_SQL_COL_VALUE_INT} FROM {_SQL_TAB_ITEMS} "
+			f"WHERE {_SQL_COL_TYPE}={_TYPE_INT}"
+	)
+	if select_one:
+		query=f"{query} AND {_SQL_COL_VALUE_INT}={target}"
+
+	if select_slice:
+		if idx_min_ok:
+			query=(
+				f"{query} AND ("
+					f"{_SQL_COL_VALUE_INT}={target[0]} OR "
+					f"{_SQL_COL_VALUE_INT}>{target[0]}"
+				")"
+			)
+
+		if idx_max_ok:
+			query=(
+				f"{query} AND ("
+					f"{_SQL_COL_VALUE_INT}={target[1]} OR "
+					f"{_SQL_COL_VALUE_INT}<{target[1]}"
+				")"
+			)
+
+	if sort_results in (_SORT_LOW_TO_HI,_SORT_HI_TO_LOW):
+		query=f"{query} ORDER BY {_SQL_COL_VALUE_INT}"
+		if sort_results==_SORT_LOW_TO_HI:
+			query=f"{query} ASC"
+		if sort_results==_SORT_HI_TO_LOW:
+			query=f"{query} DESC"
+
+	isolated=isinstance(con_or_cur,SQLConnection)
+	cur=db_getcur(con_or_cur)
+	cur.execute(query.strip())
+
+	if display_results:
+		print(
+			db_fz_num.__name__,
+			f"[{target}]"
+		)
+		for row in cur:
+			print(f"\t{row}")
+
+		return None
+
+	results=cur.fetchall()
+
+	if isolated:
+		cur.close()
+
+	return results
 
 # Class object with ALL the functions
 
 class DBControl:
-
-	# fpath:Optional[Path]=None
-	# setup:bool=False
 
 	verbose:bool=False
 
@@ -1141,90 +1335,6 @@ class DBControl:
 
 		# self.fpath=filepath
 		# self.setup=setup
-
-	def __enter__(self):
-
-		self.dbg_msg("opening context manager")
-
-		self.as_cm=True
-
-		return self
-
-	def __exit__(self,exc_type,exc_value,exc_traceback):
-
-		if not self.as_cm:
-			self.dbg_msg("NOTE: This method is not meant to run outside the context manager")
-			raise Exception("WTF man")
-
-		has_cursor=(self.cur is not None)
-		has_tx=self.con.in_transaction
-
-		self.dbg_msg(f"closing context manager; has_cursor = {has_cursor}; has_tx = {has_tx}")
-
-		if exc_type is None:
-
-			if has_cursor and has_tx:
-				self.dbg_msg("committing changes to the pending transaction on the cursor")
-				self.cur.execute("COMMIT;")
-				self.cur.close()
-				has_tx=self.con.in_transaction
-
-			if has_tx:
-				self.dbg_msg("committing changes to ALL pending transactions from this connection")
-				self.con.commit()
-
-		if exc_type is not None:
-
-			if has_cursor and has_tx:
-				self.dbg_msg("rolling back due to an error")
-				self.cur.execute("ROLLBACK;")
-
-		if has_cursor:
-			self.dbg_msg("closing the cursor before closing the connection")
-			self.cur.close()
-
-		self.dbg_msg("closing the connection")
-		self.con.close()
-
-	def close(self,rollback:bool=False)->bool:
-
-		# NOTE: Rollback only works if the cursor is up and it has a pending transaction
-
-		if self.as_cm:
-			self.dbg_msg("NOTE: This method is not meant to run inside a context manager")
-			return False
-
-		has_cursor=(self.cur is not None)
-		has_tx=self.con.in_transaction
-
-		self.dbg_msg(f"closing the object; has_cursor = {has_cursor}; has_tx = {has_tx}")
-
-		if not rollback:
-
-			if has_cursor and has_tx:
-				self.dbg_msg("committing changes to the pending transaction on the cursor")
-				self.cur.execute("COMMIT;")
-				self.cur.close()
-				has_tx=self.con.in_transaction
-
-			if has_tx:
-				self.dbg_msg("committing changes to ALL pending transactions from this connection")
-				self.con.commit()
-
-		if rollback:
-
-			if has_cursor and has_tx:
-				self.dbg_msg("rolling back due to an error")
-				self.cur.execute("ROLLBACK;")
-
-		if has_cursor:
-			self.dbg_msg("closing the cursor before closing the connection")
-			self.cur.close()
-
-		self.dbg_msg("closing the connection")
-		self.con.close()
-
-		return True
 
 	def db_tx_begin(self)->bool:
 
@@ -1321,13 +1431,13 @@ class DBControl:
 			return db_delete(
 				self.cur,
 				keyname,
-				return_value=retval,
+				return_val=retval,
 				verbose=self.verbose
 			)
 		return db_delete(
 			self.con,
 			keyname,
-			return_value=retval,
+			return_val=retval,
 			verbose=self.verbose
 		)
 
@@ -1383,13 +1493,13 @@ class DBControl:
 			return db_ldelete(
 				self.cur,
 				keyname,target,
-				return_values=retval,
+				return_val=retval,
 				verbose=self.verbose
 			)
 		return db_ldelete(
 			self.con,
 			keyname,target,
-			return_values=retval,
+			return_val=retval,
 			verbose=self.verbose
 		)
 
@@ -1408,7 +1518,7 @@ class DBControl:
 				keyname,
 				new,remove,
 				force=force,
-				return_value=retval,
+				return_val=retval,
 				verbose=self.verbose
 			)
 		return db_hupdate(
@@ -1416,25 +1526,28 @@ class DBControl:
 			keyname,
 			new,remove,
 			force=force,
-			return_value=retval,
+			return_val=retval,
 			verbose=self.verbose
 		)
 
 	def db_hget(
 			self,
 			keyname:str,
-			target:list=[]
+			subkeys:list=[]
 		)->Mapping:
+
+		if len(subkeys)==0:
+			return {}
 
 		if self.cur is not None:
 			return db_hget(
 				self.cur,
-				keyname,target,
+				keyname,subkeys=subkeys,
 				verbose=self.verbose
 			)
 		return db_hget(
 			self.con,
-			keyname,target,
+			keyname,subkeys=subkeys,
 			verbose=self.verbose
 		)
 
@@ -1453,25 +1566,130 @@ class DBControl:
 			keyname
 		)
 
-	def db_fmstr(
+	def db_fz_str(
 			self,
 			sub_str:str,
+			starts_with:bool=False
 		)->list:
 
 		if self.cur is not None:
-			return db_fmstr(
+			return db_fz_str(
 				self.cur,
 				sub_str,
+				starts_with=starts_with,
 			)
-		return db_fmstr(
+		return db_fz_str(
 			self.con,
 			sub_str,
+			starts_with=starts_with,
 		)
+
+	def db_fz_num(
+		self,
+		target:Union[tuple],
+		sort_results:bool=_SORT_NONE
+	)->list:
+
+		if self.cur is not None:
+			return db_fz_num(
+				self.cur,target,
+				sort_results=sort_results
+			)
+
+		return db_fz_num(
+			self.con,target,
+			sort_results=sort_results
+		)
+
+	def __enter__(self):
+
+		self.dbg_msg("opening context manager")
+
+		self.as_cm=True
+
+		return self
+
+	def __exit__(self,exc_type,exc_value,exc_traceback):
+
+		if not self.as_cm:
+			self.dbg_msg("NOTE: This method is not meant to run outside the context manager")
+			raise Exception("WTF man")
+
+		has_cursor=(self.cur is not None)
+		has_tx=self.con.in_transaction
+
+		self.dbg_msg(f"closing context manager; has_cursor = {has_cursor}; has_tx = {has_tx}")
+
+		if exc_type is None:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("committing changes to the pending transaction on the cursor")
+				self.cur.execute("COMMIT;")
+				self.cur.close()
+				has_tx=self.con.in_transaction
+
+			if has_tx:
+				self.dbg_msg("committing changes to ALL pending transactions from this connection")
+				self.con.commit()
+
+		if exc_type is not None:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("discarding all pending changes")
+				self.cur.execute("ROLLBACK;")
+
+		if has_cursor:
+			self.dbg_msg("closing the cursor before closing the connection")
+			self.cur.close()
+
+		self.dbg_msg("closing the connection")
+		self.con.close()
+
+	def close(self,rollback:bool=False)->bool:
+
+		# NOTE: Rollback only works if the cursor is up and it has a pending transaction
+
+		if self.as_cm:
+			self.dbg_msg("NOTE: This method is not meant to run inside a context manager")
+			return False
+
+		has_cursor=(self.cur is not None)
+		has_tx=self.con.in_transaction
+
+		self.dbg_msg(f"closing the object; has_cursor = {has_cursor}; has_tx = {has_tx}")
+
+		if not rollback:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("committing changes to the pending transaction on the cursor")
+				self.cur.execute("COMMIT;")
+				self.cur.close()
+				has_tx=self.con.in_transaction
+
+			if has_tx:
+				self.dbg_msg("committing changes to ALL pending transactions from this connection")
+				self.con.commit()
+
+		if rollback:
+
+			if has_cursor and has_tx:
+				self.dbg_msg("discarding all pending changes")
+				self.cur.execute("ROLLBACK;")
+
+		if has_cursor:
+			self.dbg_msg("closing the cursor before closing the connection")
+			self.cur.close()
+
+		self.dbg_msg("closing the connection")
+		self.con.close()
+
+		return True
 
 # Transaction object
 
 class DBTransaction:
 
+	rollback:bool=False
 	cur:Optional[SQLCursor]=None
 	sqlcon:Optional[SQLConnection]=None
 	verbose:bool=False
@@ -1523,7 +1741,7 @@ class DBTransaction:
 
 		return db_delete(
 			self.cur,keyname,
-			return_value=retval,
+			return_val=retval,
 			verbose=self.verbose
 		)
 
@@ -1564,7 +1782,7 @@ class DBTransaction:
 		return db_ldelete(
 			self.cur,
 			keyname,target,
-			return_values=retval,
+			return_val=retval,
 			verbose=self.verbose
 		)
 
@@ -1582,19 +1800,22 @@ class DBTransaction:
 			keyname,
 			new,remove,
 			force=force,
-			return_value=retval,
+			return_val=retval,
 			verbose=self.verbose
 		)
 
 	def db_hget(
 			self,
 			keyname:str,
-			target:list=[]
+			subkeys:list=[]
 		)->Mapping:
+
+		if len(subkeys)==0:
+			return {}
 
 		return db_hget(
 			self.cur,
-			keyname,target,
+			keyname,subkeys=subkeys,
 			verbose=self.verbose
 		)
 
@@ -1608,15 +1829,37 @@ class DBTransaction:
 			keyname
 		)
 
-	def db_fmstr(
+	def db_fz_str(
 			self,
 			sub_str:str,
+			starts_with:bool=False
 		)->list:
 
-		return db_fmstr(
+		return db_fz_str(
 			self.cur,
 			sub_str,
+			starts_with=starts_with,
 		)
+
+	def db_fz_num(
+		self,
+		target:Union[tuple],
+		sort_results:bool=_SORT_NONE
+	)->list:
+
+		return db_fz_num(
+			self.cur,target,
+			sort_results=sort_results
+		)
+
+	def db_req_rollback(self):
+
+		# Requests a rollback so that at the end of the context
+		# manager, all pending transactions are dropped
+
+		if not self.rollback:
+			self.dbg_msg("rollback requested")
+			self.rollback=True
 
 	def __enter__(self):
 
@@ -1640,8 +1883,8 @@ class DBTransaction:
 			self.dbg_msg("committing changes to the database")
 			self.cur.execute("COMMIT")
 
-		if exc_type is not None:
-			self.dbg_msg("rolling back changes due to an error")
+		if (exc_type is not None) or self.rollback:
+			self.dbg_msg("discarding all pending changes")
 			self.cur.execute("ROLLBACK")
 
 		self.dbg_msg("closing the cursor")
