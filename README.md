@@ -50,129 +50,100 @@ db_getcur(con_or_cur,begin_transaction) returns Cursor
 
 ```
 db_post(con_or_cur,key_name,value,force)
-
 returns bool
+
+→ Writes a value to the database with a key name
+→ If the key already exists, it will throw an error, unless "force" is used
 ```
-
-- Writes a value to the database with a key name
-
-- If the key already exists, it will throw an error, unless "force" is used
 
 ```
 db_get(con_or_cur,key_name)
-
 returns None or Any
-```
 
-- Pulls a value from a specific key from a database
+→ Pulls a value from a specific key from a database
+```
 
 ```
 db_delete(con_or_cur,key_name,return_val)
-
 returns bool, None or Any
+
+→ Finds and deletes a value by its key
+→ If "return_val" (False by default) is True, the now deleted value is returned
 ```
-
-- Finds and deletes a value by its key
-
-- If "return_val" (False by default) is True, the now deleted value is returned
-
 
 ##### Lists
 
 ```
 db_lpost(con_or_cur,key_name,value,force)
-
 returns bool
+
+→ Adds a value to an existing list
+→ If the value itself is a list, the stored list is extended
+→ If the stored value is not a list, you will need "force" to replace the value
 ```
-
-- Adds a value to an existing list
-
-- If the value itself is a list, the stored list is extended
-
-- If the stored value is not a list, you will need "force" to replace the value
 
 ```
 db_lget(con_or_cur,key_name,target)
-
 returns None, list or Any
+
+→ Pulls a specific index or slice from a list (using target)
+→ Returns a list if it's a slice, returns Any or None if it's a specific index
 ```
-
-- Pulls a specific index or slice from a list (using target)
-
-- Returns a list if it's a slice, returns Any or None if it's a specific index
 
 ```
 db_ldelete(con_or_cur,key_name,target,return_val)
-
 returns bool
+
+→ Deletes a specific index or slice from a list (using target, again)
+→ By default it returns wether the targets were deleted (True) or not (False)
+→ When using "return_val", the function returns all the deleted elements
 ```
-
-- Deletes a specific index or slice from a list (using target, again)
-
-- By default it returns wether the targets were deleted (True) or not (False)
-
-- When using "return_val", the function returns all the deleted elements
-
 
 ##### Hashmaps
 
 ```
 db_hupdate(con_or_cur,key_name,data_to_add,data_to_remove,return_val,force)
-
 returns bool or Mapping
+
+→ Updates a key with a new dictionary to merge (data_to_add) and/or keys to delete (data_to_remove)
+→ By default returns True if it managed to do everything right, False if it didn't
+→ When "return_val" (False by default) is set to True, the removed values are returned
 ```
-
-- Updates a key with a new dictionary to merge (data_to_add) and/or keys to delete (data_to_remove)
-
-- By default returns True if it managed to do everything right, False if it didn't
-
-- When "return_val" (False by default) is set to True, the removed values are returned
 
 ```
 db_hget(con_or_cur,key_name,subkeys)
-
 returns Mapping
+
+→ Given a key that SHOULD lead to a hashmap, and a list of subkeys, a Mapping based on that selection should be returned, otherwise an empty dict will
+→ If the subkeys list is empty, you get NOTHING
 ```
-
-- Given a key that SHOULD lead to a hashmap, and a list of subkeys, a Mapping based on that selection should be returned, otherwise an empty dict will
-
-- If the subkeys list is empty, you get NOTHING
-
 
 ##### Others (read only)
 
 ```
 db_len(con_or_cur,key_name)
-
 returns int
+
+→ By deault, it returns the ammount of items in the database
+→ If "key_name" (None by default) is provided, it will (attempt to) return the length of the list or hashmap that correspond to that key
 ```
-
-- By deault, it returns the ammount of items in the database
-
-- If "key_name" (None by default) is provided, it will (attempt to) return the length of the list or hashmap that correspond to that key
 
 ```
 db_fz_str(con_or_cur,substr,starts_with)
-
 returns list
+
+→ Given a string, this function performs a fuzzy search in the database and returns a list of matches
+→ If you use "starts_with", the stored strings must START WITH the given string
+→ The list is sorted according to the quality of the results: the first element is gauranteed to be the best match possible
 ```
-
-- Given a string, this function performs a fuzzy search in the database and returns a list of matches
-
-- If you use "starts_with", the stored strings must START WITH the given string
-
-- The list is sorted according to the quality of the results: the first element is gauranteed to be the best match possible
 
 ```
 db_fz_num(con_or_cur,target,sort_results)
-
 returns list
+
+→ Given a target (single number or range of numbers), find all keys that match
+→ By default, results aren't sorted, so if you want sorted results, set "sort_results" to -1 (descending) or 1 (ascending)
 ```
-
-- Given a target (single number or range of numbers), find all keys that match
-
-- By default, results aren't sorted, so if you want sorted results, set "sort_results" to -1 (descending) or 1 (ascending)
-
 
 #### Transaction functions
 
@@ -180,31 +151,27 @@ These functions take a cursor as a main argument, they allow you to begin, commi
 
 ```
 db_tx_begin(cursor)
-```
 
 - Begins transaction on a cursor
+```
 
 ```
 db_tx_commit(cursor,close_cursor)
+
+→ Commits changes to the database
+→ If "close_cursor" is True, the cursor is also closed
 ```
-
-- Commits changes to the database
-
-- If "close_cursor" is True, the cursor is also closed
 
 ```
 db_tx_rollback(cursor,close_cursor)
+
+→ Trashes the transaction
+→ If "close_cursor" is True, the cursor is also closed
 ```
-
-- Trashes the transaction
-
-- If "close_cursor" is True, the cursor is also closed
-
 
 ### Classes
 
 See "test_classes.py" for usage example
-
 
 #### DBControl
 
@@ -278,22 +245,24 @@ When used as an integer, it can be any int value. For lists, negative numbers se
 
 When used as a tuple, the tuple must meet several requirements:
 
-- Form of ( X , Y ). In other words, length of 2
+```
+( X:Optional[int] , Y:Optional[int] )
 
-- X or Y must be integers or None. Both of them CANNOT be None
+X or Y can be None, X and Y cannot be None
 
-- In the case X or Y are integers, they have to be larger than or equal to zero
+if X and Y are integers, X must be smaller than Y
 
-- In case X and Y are both integers, X must be smaller than Y, because X is the min and Y is the max
+In the specific case of list indexes, these ingeters CANNOT be negative
+```
 
 These are some valid target tuples:
 
-- (3,None)
+- (3,None) Selects 3 and larger than 3
 
-- (None,9)
+- (None,9) Selects 9 and below 9
 
-- (42,69)
+- (-42,69) Selects all values between -42 and 69, including 42 and 69
 
-- (0, 60)
+- (0, 60) Selects all values between 0 and 60, including 0 and 60
 
 In the files "test_lists.py" and "test_matching.py" you can see some example code of how the target tuple is used
