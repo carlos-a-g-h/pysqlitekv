@@ -19,7 +19,7 @@ Check out the "test_*.py" files for usage examples
 The standalone functions is what make this library GREAT
 
 
-#### Initializaion functions
+#### Initialization functions
 
 
 db_init(filepath,confirm_only) returns bool, None or Connection
@@ -46,22 +46,31 @@ db_getcur(con_or_cur,begin_transaction) returns Cursor
 #### Main functions
 
 
-##### Basic
+##### Basic/Any data type
 
+```
+db_post(con_or_cur,key_name,value,force)
 
-db_post(con_or_cur,key_name,value,force) returns bool
+returns bool
+```
 
 - Writes a value to the database with a key name
 
 - If the key already exists, it will throw an error, unless "force" is used
 
+```
+db_get(con_or_cur,key_name)
 
-db_get(con_or_cur,key_name) returns None or Any
+returns None or Any
+```
 
 - Pulls a value from a specific key from a database
 
+```
+db_delete(con_or_cur,key_name,return_val)
 
-db_delete(con_or_cur,key_name,return_val) returns bool, None or Any
+returns bool, None or Any
+```
 
 - Finds and deletes a value by its key
 
@@ -70,8 +79,11 @@ db_delete(con_or_cur,key_name,return_val) returns bool, None or Any
 
 ##### Lists
 
+```
+db_lpost(con_or_cur,key_name,value,force)
 
-db_lpost(con_or_cur,key_name,value,force) returns bool
+returns bool
+```
 
 - Adds a value to an existing list
 
@@ -79,15 +91,21 @@ db_lpost(con_or_cur,key_name,value,force) returns bool
 
 - If the stored value is not a list, you will need "force" to replace the value
 
+```
+db_lget(con_or_cur,key_name,target)
 
-db_lget(con_or_cur,key_name,target) returns None, list or Any
+returns None, list or Any
+```
 
 - Pulls a specific index or slice from a list (using target)
 
 - Returns a list if it's a slice, returns Any or None if it's a specific index
 
+```
+db_ldelete(con_or_cur,key_name,target,return_val)
 
-db_ldelete(con_or_cur,key_name,target,return_val) returns bool
+returns bool
+```
 
 - Deletes a specific index or slice from a list (using target, again)
 
@@ -98,8 +116,11 @@ db_ldelete(con_or_cur,key_name,target,return_val) returns bool
 
 ##### Hashmaps
 
+```
+db_hupdate(con_or_cur,key_name,data_to_add,data_to_remove,return_val,force)
 
-db_hupdate(con_or_cur,key_name,data_to_add,data_to_remove,return_val,force) returns bool or Mapping
+returns bool or Mapping
+```
 
 - Updates a key with a new dictionary to merge (data_to_add) and/or keys to delete (data_to_remove)
 
@@ -107,8 +128,11 @@ db_hupdate(con_or_cur,key_name,data_to_add,data_to_remove,return_val,force) retu
 
 - When "return_val" (False by default) is set to True, the removed values are returned
 
+```
+db_hget(con_or_cur,key_name,subkeys)
 
-db_hget(con_or_cur,key_name,subkeys) returns Mapping
+returns Mapping
+```
 
 - Given a key that SHOULD lead to a hashmap, and a list of subkeys, a Mapping based on that selection should be returned, otherwise an empty dict will
 
@@ -117,15 +141,21 @@ db_hget(con_or_cur,key_name,subkeys) returns Mapping
 
 ##### Others (read only)
 
+```
+db_len(con_or_cur,key_name)
 
-db_len(con_or_cur,key_name) returns int
+returns int
+```
 
 - By deault, it returns the ammount of items in the database
 
 - If "key_name" (None by default) is provided, it will (attempt to) return the length of the list or hashmap that correspond to that key
 
+```
+db_fz_str(con_or_cur,substr,starts_with)
 
-db_fz_str(con_or_cur,substr,starts_with) returns list
+returns list
+```
 
 - Given a string, this function performs a fuzzy search in the database and returns a list of matches
 
@@ -133,8 +163,11 @@ db_fz_str(con_or_cur,substr,starts_with) returns list
 
 - The list is sorted according to the quality of the results: the first element is gauranteed to be the best match possible
 
+```
+db_fz_num(con_or_cur,target,sort_results)
 
-db_fz_num(con_or_cur,target,sort_results) returns list
+returns list
+```
 
 - Given a target (single number or range of numbers), find all keys that match
 
@@ -145,20 +178,23 @@ db_fz_num(con_or_cur,target,sort_results) returns list
 
 These functions take a cursor as a main argument, they allow you to begin, commit or rollback a transaction on that cursor
 
-
+```
 db_tx_begin(cursor)
+```
 
 - Begins transaction on a cursor
 
-
+```
 db_tx_commit(cursor,close_cursor)
+```
 
 - Commits changes to the database
 
 - If "close_cursor" is True, the cursor is also closed
 
-
+```
 db_tx_rollback(cursor,close_cursor)
+```
 
 - Trashes the transaction
 
@@ -172,7 +208,9 @@ See "test_classes.py" for usage example
 
 #### DBControl
 
+```
 DBControl(filepath,setup)
+```
 
 On init this class takes a filepath as an argument, and creates its own connection
 
@@ -187,7 +225,9 @@ This class can be used as a simple object or as a context manager
 
 #### DBTransaction
 
+```
 DBTransaction(connection)
+```
 
 On init, this class takes an existing connection as an argument and creates its own cursor and transaction on top of it
 
