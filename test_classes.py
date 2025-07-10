@@ -1,6 +1,7 @@
 #!/usr/bin/python3.9
 
-from a_key_value_store_on_top_of_sqlite import (
+# from a_key_value_store_on_top_of_sqlite import (
+from yanosqlkvslibsqlite import (
 	DBControl,
 	DBTransaction,
 	db_getcon,db_get

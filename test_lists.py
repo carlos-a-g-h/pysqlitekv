@@ -1,6 +1,7 @@
 #!/usr/bin/python3.9
 
-from a_key_value_store_on_top_of_sqlite import (
+# from a_key_value_store_on_top_of_sqlite import (
+from yanosqlkvslibsqlite import (
 	db_init,
 	db_getcur,db_tx_commit,
 	db_post,db_get,db_lpost,db_lget,db_ldelete
@@ -43,6 +44,8 @@ if __name__=="__main__":
 
 	# To read from a list, you use db_lget(), like this:
 	db_lget(con,keyname,4,display_results=True)
+	db_lget(con,keyname,20,display_results=True)
+	db_lget(con,keyname,-8,display_results=True)
 
 	# What if you want to read a specific portion of the list? you use a tuple, like this:
 	db_lget(con,keyname,(3,None),display_results=True)
