@@ -1,7 +1,6 @@
 #!/usr/bin/python3.9
 
-# from a_key_value_store_on_top_of_sqlite import (
-from yanosqlkvslibsqlite import (
+from pysqlitekv import (
 	db_init,
 	db_getcur,db_tx_commit,
 	db_post,db_fz_str,db_fz_num,_SORT_HI_TO_LOW

@@ -5,14 +5,32 @@ I am incapable of giving this thing a good name
 
 ## How to install
 
-This is the file: "yanosqlkvslibsqlite.py"
+This is the file: "pysqlitekv.py"
 
 Just copy it directly to your code and import stuff from it
 
+The async version, "pysqlitekv_async.py", depends on "pysqlitekv.py" and the aiosqlite library
 
 ## API
 
 Check out the "test_*.py" files for usage examples
+
+### Data types
+
+These are all the data types that are directly supported
+
+- Booleans
+
+- Integers (floats are converted directly)
+
+- Strings
+
+- Lists
+
+- Hashmaps
+
+- Any (any other object including custom classes and tuples)
+
 
 ### Standalone functions
 
@@ -53,6 +71,7 @@ db_post(
     con_or_cur,
     key_name,
     value,
+    page,
     force
   )
   returns bool
@@ -64,7 +83,8 @@ If the key already exists, it will throw an error, unless "force" is used
 ```
 db_get(
     con_or_cur,
-    key_name
+    key_name,
+    page
   )
   returns None or Any
 
@@ -75,6 +95,7 @@ Pulls a value from a specific key from a database
 db_delete(
     con_or_cur,
     key_name,
+    page,
     return_val
   )
   returns bool, None or Any
@@ -90,6 +111,7 @@ db_lpost(
     con_or_cur,
     key_name,
     value,
+    page,
     force
   )
   returns bool
@@ -103,7 +125,8 @@ If the stored value is not a list, you will need "force" to replace the value
 db_lget(
     con_or_cur,
     key_name,
-    target
+    target,
+    page
   )
   returns None, list or Any
 
@@ -116,6 +139,7 @@ db_ldelete(
     con_or_cur,
     key_name,
     target,
+    page,
     return_val
   )
   returns bool
@@ -131,6 +155,7 @@ When using "return_val", the function returns all the deleted elements
 db_hupdate(
     con_or_cur,
     key_name,
+    page,
     data_to_add,
     data_to_remove,
     return_val,
@@ -164,25 +189,36 @@ db_custom(
     custom_func,
     custom_func_params,
     res_write,
-    res_return
+    res_return,
+    page
   )
-  returns None or Any
+  returns bool, None or Any
 
 Runs a custom function on a stored value
 "custom_func" is the custom function
 "custom_func_params" is the aditional argument for the custom function, it can be anything
 "res_write" writes the result of the custom function to the keyname, replacing the original value
 "res_return" returns the result of the custom function
+If "res_write" is True and "res_return" is False, db_custom() returns wether the stored value was modified or not
 
 For more details, check out "test_customfun.py"
 ```
 
 ```
-db_len(con_or_cur,key_name)
+db_len(con_or_cur,key_name,page)
   returns int
 
-By deault, it returns the ammount of items in the database
-If "key_name" (None by default) is provided, it will (attempt to) return the length of the list or hashmap that correspond to that key
+Returns the length of the list or hashmap that correspond to that key
+In case of failure, it returns -1
+```
+
+```
+db_keys(con_or_cur,qtty,limit,page)
+  returns List or Int
+
+Returns all the keys in the database
+The argument "qtty" (False by default) returns the ammount of keys instead of the list
+The argument "limit", (0 by default) limits the ammount of results
 ```
 
 ```
@@ -265,6 +301,18 @@ On init, this class takes an existing connection as an argument and creates its 
 
 This class has access to all standalone functions as methods, but no access to the transaction functions
 
+#### DBReadOnly
+
+```
+DBReadOnly(filepath)
+```
+
+Grants read-only access to a database
+
+Useful for heavy reading, there are no write methods
+
+The db_custom() method for this class does now do write changes, but it does return the result of the custom function that is ran
+
 
 #### The purpose of these classes
 
@@ -331,3 +379,10 @@ These are some valid target tuples:
 - (0, 60) Selects all values between 0 and 60, including 0 and 60
 
 In the files "test_lists.py" and "test_matching.py" you can see some example code of how the target tuple is used
+
+
+#### The "page" argument
+
+By default a single table is used to store all the data. Need to have different data without using an extra file? Check out the "test_pages.py" file to see how to create additional pages on a single file
+
+All main functions and methods (db_post(), db_lget(), db_hupdate(), etc...) have access to the "page" argument

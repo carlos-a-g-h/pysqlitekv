@@ -1,10 +1,10 @@
 #!/usr/bin/python3.9
 
-# from a_key_value_store_on_top_of_sqlite import (
-from yanosqlkvslibsqlite import (
+from pysqlitekv import (
 	DBControl,
 	DBTransaction,
-	db_getcon,db_get
+	DBReadOnly,
+	db_getcon,db_get,db_keys
 )
 
 if __name__=="__main__":
@@ -25,11 +25,9 @@ if __name__=="__main__":
 	# it closes everything related to the connection
 
 	with DBControl(fpath,setup=True,cfg_verbose=True) as dbc:
-
 		dbc.db_post("key0","hello")
 
 		if dbc.db_tx_begin():
-			# assert False
 			dbc.db_post("key1",[1,2,3,4,5])
 			dbc.db_lpost("key1",["66",7,88])
 
@@ -39,9 +37,9 @@ if __name__=="__main__":
 	# in this case, you have to use .close() to do the cleanup
 
 	mydb=DBControl(fpath,cfg_verbose=True)
+	
 
 	another_key="Another Key"
-
 	mydb.db_hupdate(
 		another_key,
 		{"eggs":69}
@@ -97,29 +95,43 @@ if __name__=="__main__":
 				cfg_verbose=True
 			) as tx:
 	
-			tx.db_hupdate(k,new={"name":"Mike"},remove=["person"])
+			tx.db_hupdate(
+				k,
+				new={"name":"Mike"},
+				remove=["person"]
+			)
 			# assert False
-			tx.db_hupdate(k,new={"age":45,"bald":"Yes"})
+			tx.db_hupdate(
+				k,
+				new={"age":45,"bald":"Yes"}
+			)
 
 	except Exception as exc:
 		print(exc)
 
 	db_get(new_con,k,display_results=True)
-
 	new_con.close()
+
+	print("\nDBReadOnly")
+
+	with DBReadOnly(fpath,cfg_verbose=True) as dbro:
+
+		keys=dbro.db_keys()
+		print("keys in this DB:",keys)
+
+		print("key0 =",dbro.db_get("key0"))
 
 	# VERY IMPORTANT NOTE:
 
-	# It is not recommended AT ALL to use DBTransaction within DBControl's context manager 
-	# unless you know exactly what you are doing, because both classes are meant to be
+	# DO NOT MIX CURSORS AND CONNECTIONS FROM DIFFERENT CLASSES TOGETHER
+	# unless you know exactly what you are doing, because all classes are meant to be
 	# used in different scenarios:
 
 	# DBControl → Creates a connection from scratch and its own cursors and transactions
 	# Recommended for looking around stuff in the database
 
 	# DBTransaction → Creates a cursor + a transaction from existing connection
-	# Recommended for precise writes on the database
+	# Recommended for precise writing on the database
 
-	# Both classes have ALL the standalone methods. In the specific case of DBTransaction,
-	# the only methods that are missing are the ones that have to do with controlling
-	# transactions, this is because THAT IS THE CONTEXT MANAGER'S JOB
+	# DBReadOnly → Creates a connection from a file and its own cursor
+	# Recommended if all you're gonna do is read heavily (because it has no write methods)

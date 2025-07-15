@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import Union
 
-from yanosqlkvslibsqlite import DBControl,db_check_changes
+from pysqlitekv import DBControl
 
 def last_person_in_line_is_now_first(the_list:list):
 
@@ -70,13 +70,14 @@ if __name__=="__main__":
 			f"{kn_list} =",
 			dbctl.db_get(kn_list)
 		)
-		dbctl.db_custom(
+		ok=dbctl.db_custom(
 			kn_list,
 			last_person_in_line_is_now_first,
 			res_write=True
 		)
+		print("custom func conf. =",ok)
 
-		db_check_changes(dbctl.cur,True)
+		# db_check_changes(dbctl.cur,True)
 
 		print(
 			"The last one is now the first one:",
