@@ -8,7 +8,7 @@ This is the file: "pysqlitekv.py"
 
 Just copy it directly to your code and import stuff from it
 
-The async version, "pysqlitekv_async.py", depends on "pysqlitekv.py" and the aiosqlite library
+The async variant, "pysqlitekv_async.py", depends on "pysqlitekv.py" and the aiosqlite library
 
 ## API
 
