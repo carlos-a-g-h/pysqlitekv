@@ -1,7 +1,6 @@
 # Yet another NoSQL/Key-Value-store library on top of SQLite for python
 
-I am incapable of giving this thing a good name
-
+Yes
 
 ## How to install
 
