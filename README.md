@@ -30,11 +30,9 @@ These are all the data types that are directly supported
 
 - Any (any other object including custom classes and tuples)
 
-
 ### Standalone functions
 
 The standalone functions are the corner stone of this library, even the async support depends on these
-
 
 #### Init/connection functions
 
@@ -71,9 +69,9 @@ In case of giving it a cursor, the same cursor is returned
 
 The arg "begin_transaction" (False by default) allows you to initiate a transaction on the new cursor
 
+***
 
 #### Main functions
-
 
 ##### db_post()
 
@@ -121,6 +119,8 @@ db_delete(
 Finds and deletes a value by its key
 
 If "return_val" (False by default) is True, the now deleted value is returned
+
+***
 
 #### Lists
 
@@ -178,6 +178,7 @@ By default it returns wether the targets were deleted (True) or not (False)
 
 When using "return_val", the function returns all the deleted elements
 
+***
 
 #### Hashmaps
 
@@ -221,6 +222,8 @@ If the subkeys list is empty, you get NOTHING
 The "aon" argument means "All Or Nothing", which means that if one of the keys in "subkeys" is not found, the function will return nothing
 
 Check out the "test_hashmaps.py" file for more info
+
+***
 
 #### Other
 
@@ -309,6 +312,8 @@ Given a target (single number or range of numbers), find all keys that match
 
 By default, results aren't sorted, so if you want sorted results, set "sort_results" to -1 (descending) or 1 (ascending)
 
+***
+
 #### Transaction functions
 
 These functions take a cursor as a main argument, they allow you to begin, commit or rollback a transaction on that cursor
@@ -341,6 +346,8 @@ db_tx_rollback(cursor,close_cursor) returns bool
 Discards the transaction
 
 If "close_cursor" (False by default) is True, the cursor is also closed
+
+***
 
 ### Classes
 
@@ -392,6 +399,7 @@ Managing connections and cursors by hand can be a pain in the ass, so the idea w
 
 WARNING: Don't mix contet managers and resources of these classes
 
+***
 
 ### Important concepts
 
