@@ -120,7 +120,7 @@ Finds and deletes a value by its key
 
 If "return_val" (False by default) is True, the now deleted value is returned
 
-***
+<!-- *** -->
 
 #### Lists
 
@@ -178,7 +178,7 @@ By default it returns wether the targets were deleted (True) or not (False)
 
 When using "return_val", the function returns all the deleted elements
 
-***
+<!-- *** -->
 
 #### Hashmaps
 
@@ -223,7 +223,7 @@ The "aon" argument means "All Or Nothing", which means that if one of the keys i
 
 Check out the "test_hashmaps.py" file for more info
 
-***
+<!-- *** -->
 
 #### Other
 
@@ -312,7 +312,7 @@ Given a target (single number or range of numbers), find all keys that match
 
 By default, results aren't sorted, so if you want sorted results, set "sort_results" to -1 (descending) or 1 (ascending)
 
-***
+<!-- *** -->
 
 #### Transaction functions
 
@@ -347,7 +347,7 @@ Discards the transaction
 
 If "close_cursor" (False by default) is True, the cursor is also closed
 
-***
+<!-- *** -->
 
 ### Classes
 
