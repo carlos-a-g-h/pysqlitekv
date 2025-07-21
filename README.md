@@ -39,7 +39,7 @@ The standalone functions are the corner stone of this library, even the async su
 
 #### Init/connection functions
 
-#### db_init()
+##### db_init()
 
 ```
 db_init(filepath,confirm_only)
@@ -50,7 +50,7 @@ Takes a path to a file as an argument and initializes an SQL Table and returning
 
 The arg "confirm_only" (False by default), makes the function only return True if the table was created successfully in the requested filepath
 
-#### db_getcon()
+##### db_getcon()
 
 ```
 db_getcon(filepath)
@@ -59,7 +59,7 @@ db_getcon(filepath)
 
 Takes a path to a file and returns a connection. It's just a fancy wrapper for sqlite3.connect()
 
-#### db_getcur()
+##### db_getcur()
 
 ```
 db_getcur(con_or_cur,begin_transaction)
@@ -93,7 +93,7 @@ Writes a value to the database with a key name
 
 If the key already exists, it will throw an error, unless "force" is used
 
-#### db_get()
+##### db_get()
 
 ```
 db_get(
@@ -106,7 +106,7 @@ db_get(
 
 Pulls a value from a specific key from a database
 
-#### db_delete()
+##### db_delete()
 
 ```
 db_delete(
@@ -123,9 +123,9 @@ Finds and deletes a value by its key
 
 If "return_val" (False by default) is True, the now deleted value is returned
 
-##### Lists
+#### Lists
 
-#### db_lpost()
+##### db_lpost()
 
 ```
 db_lpost(
@@ -144,7 +144,7 @@ If the value itself is a list, the stored list is extended
 
 If the stored value is not a list, you will need "force" to replace the value
 
-#### db_lget()
+##### db_lget()
 
 ```
 db_lget(
@@ -160,7 +160,7 @@ Pulls a specific index or slice from a list (using target)
 
 Returns a list if it's a slice, returns Any or None if it's a specific index
 
-#### db_ldelete()
+##### db_ldelete()
 
 ```
 db_ldelete(
@@ -180,9 +180,9 @@ By default it returns wether the targets were deleted (True) or not (False)
 When using "return_val", the function returns all the deleted elements
 
 
-##### Hashmaps
+#### Hashmaps
 
-#### db_hupdate()
+##### db_hupdate()
 
 ```
 db_hupdate(
@@ -203,7 +203,7 @@ By default returns True if it managed to do everything right, False if it didn't
 
 When "return_val" (False by default) is set to True, the removed values are returned
 
-#### db_hget()
+##### db_hget()
 
 ```
 db_hget(
@@ -223,9 +223,9 @@ The "aon" argument means "All Or Nothing", which means that if one of the keys i
 
 Check out the "test_hashmaps.py" file for more info
 
-##### Others
+#### Other
 
-#### db_custom()
+##### db_custom()
 
 ```
 db_custom(
@@ -254,7 +254,7 @@ If "res_write" is True and "res_return" is False, db_custom() returns wether the
 
 For more details, check out "test_customfun.py" and also check the "test_async.py"
 
-#### db_len()
+##### db_len()
 
 ```
 db_len(con_or_cur,key_name,page)
@@ -265,7 +265,7 @@ Returns the length of the list or hashmap that correspond to that key
 
 In case of failure, it returns -1
 
-#### db_keys()
+##### db_keys()
 
 ```
 db_keys(con_or_cur,qtty,limit,page)
@@ -278,7 +278,7 @@ The argument "qtty" (False by default) returns the ammount of keys instead of th
 
 The argument "limit", (0 by default) limits the ammount of results
 
-#### db_fz_str()
+##### db_fz_str()
 
 ```
 db_fz_str(
@@ -295,7 +295,7 @@ If you use "starts_with", the stored strings must START WITH the given string
 
 The list is sorted according to the quality of the results: the first element is gauranteed to be the best match possible
 
-#### db_fz_num()
+##### db_fz_num()
 
 ```
 db_fz_num(
@@ -314,7 +314,7 @@ By default, results aren't sorted, so if you want sorted results, set "sort_resu
 
 These functions take a cursor as a main argument, they allow you to begin, commit or rollback a transaction on that cursor
 
-#### db_tx_begin()
+##### db_tx_begin()
 
 ```
 db_tx_begin(cursor)
@@ -323,7 +323,7 @@ db_tx_begin(cursor)
 
 Begins transaction on a cursor
 
-#### db_tx_commit()
+##### db_tx_commit()
 
 ```
 db_tx_commit(cursor,close_cursor)
@@ -333,7 +333,7 @@ Commits changes to the database
 
 If "close_cursor" is True, the cursor is also closed
 
-#### db_tx_rollback()
+##### db_tx_rollback()
 
 ```
 db_tx_rollback(cursor,close_cursor)
