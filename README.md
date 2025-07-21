@@ -316,7 +316,7 @@ These functions take a cursor as a main argument, they allow you to begin, commi
 ##### db_tx_begin()
 
 ```
-db_tx_begin(cursor)
+db_tx_begin(cursor) returns bool
 
 ```
 
@@ -325,7 +325,7 @@ Begins transaction on a cursor
 ##### db_tx_commit()
 
 ```
-db_tx_commit(cursor,close_cursor)
+db_tx_commit(cursor,close_cursor) returns bool
 ```
 
 Commits changes to the database
@@ -335,7 +335,7 @@ If "close_cursor" is True, the cursor is also closed
 ##### db_tx_rollback()
 
 ```
-db_tx_rollback(cursor,close_cursor)
+db_tx_rollback(cursor,close_cursor) returns bool
 ```
 
 Discards the transaction
