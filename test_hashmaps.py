@@ -35,12 +35,43 @@ if __name__=="__main__":
 	# You can pull any key you want from a hashmap
 	db_hget(cur,key,subkeys=["name"],display_results=True)
 
+	# This is another way of using the subkeys
+	# You can specify a specific value for a key using a tuple
+	db_hget(
+		con,key,
+		subkeys=[
+			"name",
+			("age",69)
+		],
+		display_results=True
+	)
+	# This will return an empty mapping
+	db_hget(
+		con,key,
+		subkeys=[
+			("age",9)
+		],
+		display_results=True
+	)
+	# With "aon" being true, it's "all or nothing",
+	# meaning that if something is not found, it will return nothhing
+	db_hget(
+		con,key,
+		subkeys=[
+			("name","Samuel"),
+			"age",
+		],
+		aon=True,
+		display_results=True
+	)
+
 	# When you request data to be added and removed, the data is first removed and then added/merged
 	db_hupdate(cur,key,data_to_add={"unknown":True},data_to_remove=["name","age"])
 
 	# NOTE: this commit requests closing the cursor
 	db_tx_commit(cur,close_cursor=True)
 
+	# The full hashmap is whown here
 	db_get(con,key,display_results=True)
 
 	con.close()

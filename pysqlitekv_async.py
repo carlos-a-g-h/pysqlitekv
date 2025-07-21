@@ -878,6 +878,7 @@ async def db_hget(
 		con_or_cur:Union[Connection,Cursor],
 		key_name:str,
 		subkeys:list=[],
+		aon:bool=False,
 		page:int=_PAGE_DEFAULT,
 		display_results:bool=False,
 		verbose:bool=False,
@@ -912,13 +913,39 @@ async def db_hget(
 	the_thing:Mapping=pckl_decode(result[0])
 
 	selection={}
+	failed=False
 
-	for key in subkeys:
-		if key not in the_thing.keys():
-			continue
-		selection.update(
-			{key:the_thing.pop(key)}
-		)
+	for item in subkeys:
+
+		if failed:
+			break
+
+		if isinstance(item,str):
+			if item not in the_thing.keys():
+				if aon:
+					failed=True
+				continue
+			selection.update(
+				{item:the_thing.pop(item)}
+			)
+
+		if isinstance(item,tuple):
+			if len(item)==2:
+				if item[0] not in the_thing.keys():
+					if aon:
+						failed=True
+						continue
+				if not the_thing[item[0]]==item[1]:
+					if aon:
+						failed=True
+						continue
+				selection.update(
+					{item[0]:the_thing.pop(item[0])}
+				)
+
+	if failed:
+		if not len(selection)==0:
+			selection.clear()
 
 	if display_results:
 		print(

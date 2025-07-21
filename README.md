@@ -64,7 +64,7 @@ db_getcur(con_or_cur,begin_transaction) returns Cursor
 #### Main functions
 
 
-##### Basic/Any data type
+##### db_post()
 
 ```
 db_post(
@@ -75,10 +75,11 @@ db_post(
     force
   )
   returns bool
+```
 
 Writes a value to the database with a key name
+
 If the key already exists, it will throw an error, unless "force" is used
-```
 
 ```
 db_get(
@@ -87,9 +88,9 @@ db_get(
     page
   )
   returns None or Any
+```
 
 Pulls a value from a specific key from a database
-```
 
 ```
 db_delete(
@@ -100,9 +101,11 @@ db_delete(
   )
   returns bool, None or Any
 
-Finds and deletes a value by its key
-If "return_val" (False by default) is True, the now deleted value is returned
 ```
+
+Finds and deletes a value by its key
+
+If "return_val" (False by default) is True, the now deleted value is returned
 
 ##### Lists
 
@@ -115,12 +118,14 @@ db_lpost(
     force
   )
   returns bool
-
-Adds a value to an existing list
-If the value itself is a list, the stored list is extended
-If the stored value is not a list, you will need "force" to replace the value
 ```
 
+Adds a value to an existing list
+
+If the value itself is a list, the stored list is extended
+
+If the stored value is not a list, you will need "force" to replace the value
+i
 ```
 db_lget(
     con_or_cur,
@@ -129,10 +134,11 @@ db_lget(
     page
   )
   returns None, list or Any
+```
 
 Pulls a specific index or slice from a list (using target)
+
 Returns a list if it's a slice, returns Any or None if it's a specific index
-```
 
 ```
 db_ldelete(
@@ -143,11 +149,14 @@ db_ldelete(
     return_val
   )
   returns bool
+```
 
 Deletes a specific index or slice from a list (using target, again)
+
 By default it returns wether the targets were deleted (True) or not (False)
+
 When using "return_val", the function returns all the deleted elements
-```
+
 
 ##### Hashmaps
 
@@ -162,23 +171,29 @@ db_hupdate(
     force
   )
   returns bool or Mapping
+```
 
 Updates a key with a new dictionary to merge (data_to_add) and/or keys to delete (data_to_remove)
+
 By default returns True if it managed to do everything right, False if it didn't
+
 When "return_val" (False by default) is set to True, the removed values are returned
-```
 
 ```
 db_hget(
     con_or_cur,
     key_name,
-    subkeys
+    subkeys,
+    aon,
   )
   returns Mapping
+```
 
 Given a key that SHOULD lead to a hashmap, and a list of subkeys, a Mapping based on that selection should be returned, otherwise an empty dict will
+
 If the subkeys list is empty, you get NOTHING
-```
+
+Check out the 
 
 ##### Others
 
@@ -193,33 +208,41 @@ db_custom(
     page
   )
   returns bool, None or Any
+```
 
 Runs a custom function on a stored value
+
 "custom_func" is the custom function
+
 "custom_func_params" is the aditional argument for the custom function, it can be anything
+
 "res_write" writes the result of the custom function to the keyname, replacing the original value
+
 "res_return" returns the result of the custom function
+
 If "res_write" is True and "res_return" is False, db_custom() returns wether the stored value was modified or not
 
 For more details, check out "test_customfun.py"
-```
 
 ```
 db_len(con_or_cur,key_name,page)
   returns int
+```
 
 Returns the length of the list or hashmap that correspond to that key
+
 In case of failure, it returns -1
-```
 
 ```
 db_keys(con_or_cur,qtty,limit,page)
   returns List or Int
+```
 
 Returns all the keys in the database
+
 The argument "qtty" (False by default) returns the ammount of keys instead of the list
+
 The argument "limit", (0 by default) limits the ammount of results
-```
 
 ```
 db_fz_str(
@@ -228,11 +251,13 @@ db_fz_str(
     starts_with
   )
   returns list
+```
 
 Given a string, this function performs a fuzzy search in the database and returns a list of matches
+
 If you use "starts_with", the stored strings must START WITH the given string
+
 The list is sorted according to the quality of the results: the first element is gauranteed to be the best match possible
-```
 
 ```
 db_fz_num(
@@ -241,10 +266,11 @@ db_fz_num(
     sort_results
   )
   returns list
+```
 
 Given a target (single number or range of numbers), find all keys that match
+
 By default, results aren't sorted, so if you want sorted results, set "sort_results" to -1 (descending) or 1 (ascending)
-```
 
 #### Transaction functions
 
@@ -253,22 +279,25 @@ These functions take a cursor as a main argument, they allow you to begin, commi
 ```
 db_tx_begin(cursor)
 
-Begins transaction on a cursor
 ```
+
+Begins transaction on a cursor
 
 ```
 db_tx_commit(cursor,close_cursor)
+```
 
 Commits changes to the database
+
 If "close_cursor" is True, the cursor is also closed
-```
 
 ```
 db_tx_rollback(cursor,close_cursor)
+```
 
 Trashes the transaction
+
 If "close_cursor" is True, the cursor is also closed
-```
 
 ### Classes
 
